@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마곡지구 지식산업센터 10개 단지 비교 제안</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=카카오키"></script>
+    <style>
+        body { font-family: 'Pretendard', -apple-system, sans-serif; }
+        /* 카카오 지도 커스텀 오버레이 기본 그림자 제거 및 재정의 */
+        .customoverlay { position: relative; bottom: 55px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+        .customoverlay::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: #fff; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
+        <div>
+            <span class="text-xs font-bold text-blue-600 tracking-wider uppercase">Market Analysis & Proposal</span>
+            <h1 class="text-xl font-bold text-slate-900 mt-0.5">마곡지구 지식산업센터 10개 단지 비교 제안</h1>
+        </div>
+        <div class="text-right text-xs text-slate-500">
+            <p>작성일: 2026. 05</p>
+            <p>제안처: 두영시스템 귀중</p>
+        </div>
+    </header>
+
+    <div class="flex flex-1 w-full overflow-hidden">
+        
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                <h2 class="text-md font-bold text-slate-900 flex items-center gap-1.5">
+                    🏢 사무실 목록
+                    <span id="center-count" class="text-xs font-semibold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">0</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-1">목록을 클릭하면 지도가 해당 위치로 이동합니다.</p>
+            </div>
+            
+            <div id="office-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
+                <p class="text-center text-sm text-slate-400 py-8">데이터 로딩 중...</p>
+            </div>
+        </aside>
+
+        <main class="flex-1 relative bg-slate-100">
+            <div id="map" class="w-full h-full"></div>
+        </main>
+
+    </div>
+
+    <script>
+        let map; 
+        let centersData = [];
+        let currentOverlay = null; // 한번에 1개씩만 열리도록 제어하는 변수
+        let markers = []; // 마커 관리 배열
+
+        // 1. 초기 실행 및 지도 세팅
+        async function init() {
+            const mapContainer = document.getElementById('map');
+            const mapOption = {
+                center: new kakao.maps.LatLng(37.5665, 126.8285), // 마곡역 기본 로딩 중심점
+                level: 4 // 마곡 권역이 한눈에 보이는 적절한 줌 레벨
+            };
+            map = new kakao.maps.Map(mapContainer, mapOption);
+
+            // 지도 컨트롤 추가 (줌 컨트롤러)
+            const zoomControl = new kakao.maps.ZoomControl();
+            map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+            // 제공해주신 GitHub Raw JSON 연동
+            await fetchGitHubData();
+        }
+
+        // 2. GitHub 원격 저장소에서 데이터 가져오기
+        async function fetchGitHubData() {
+            const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/main/data.json';
+            
+            try {
+                const response = await fetch(jsonUrl);
+                if (!response.ok) throw new Error(`HTTP 에러 발생! 상태코드: ${response.status}`);
+                
+                centersData = await response.json();
+                
+                // 사이드바 개수 카운트 업데이트
+                document.getElementById('center-count').innerText = centersData.length;
+
+                // UI 컴포넌트 렌더링 및 지도 마커 바인딩
+                renderSidebarList(centersData);
+                createMapMarkers(centersData);
+
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+                document.getElementById('office-list').innerHTML = `
+                    <div class="p-4 text-center text-xs text-red-500 font-medium">
+                        ⚠️ 데이터를 불러오지 못했습니다.<br>JSON 파일 주소나 형식을 확인해주세요.
+                    </div>
+                `;
+            }
+        }
+
+        // 3. 좌측 사이드바 사무실 목록 렌더링
+        function renderSidebarList(data) {
+            const listContainer = document.getElementById('office-list');
+            
+            if (data.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">등록된 구역이 없습니다.</p>`;
+                return;
+            }
+
+            listContainer.innerHTML = data.map((item, index) => `
+                <div onclick="focusOnMarker(${index}, ${item.lat}, ${item.lng})" 
+                     class="p-3 hover:bg-slate-50 border border-transparent hover:border-slate-200 rounded-xl cursor-pointer transition group">
+                    <div class="flex justify-between items-start gap-1">
+                        <span class="font-bold text-sm text-slate-800 group-hover:text-blue-600 transition block truncate">${item.name}</span>
+                        <span class="inline-block shrink-0 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">${item.badge || '정보'}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1 line-clamp-1">${item.desc || '연면적: ' + item.scale}</p>
+                    <div class="mt-2 flex justify-between items-center text-[11px] font-medium border-t border-slate-50 pt-1.5">
+                        <span class="text-blue-600">평당 ${item.price ? item.price.toLocaleString() + '만' : '문의'}</span>
+                        <span class="text-emerald-600">${item.rent}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 4. 지도 마커 및 닫기가 가능한 커스텀 오버레이 매핑
+        function createMapMarkers(data) {
+            data.forEach((item, index) => {
+                if (!item.lat || !item.lng) return;
+
+                const markerPosition = new kakao.maps.LatLng(item.lat, item.lng);
+                
+                // 마커 객체 생성 및 지도 표시
+                const marker = new kakao.maps.Marker({
+                    position: markerPosition,
+                    map: map
+                });
+                
+                // 추후 사이드바 연동 클릭을 위해 배열에 보관
+                markers.push({ marker, position: markerPosition, item });
+
+                // 커스텀 오버레이 엘리먼트 동적 생성 (클릭 이벤트 차단 해제 목적)
+                const overlayContent = document.createElement('div');
+                overlayContent.className = 'customoverlay p-4 w-64 text-sm z-50';
+                overlayContent.innerHTML = `
+                    <div class="flex justify-between items-start border-b border-slate-100 pb-2 mb-2">
+                        <span class="font-bold text-slate-900 tracking-tight block truncate pr-2">${item.name}</span>
+                        <button class="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer px-1" onclick="closeOverlay()">✕</button>
+                    </div>
+                    <div class="space-y-1 text-xs mb-3 text-left">
+                        <div class="flex justify-between"><span class="text-slate-400">평당 분양가</span><span class="font-semibold text-blue-600">${item.price ? item.price.toLocaleString() + '만원' : '문의'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">보증금/월세</span><span class="font-semibold text-emerald-600">${item.rent}</span></div>
+                    </div>
+                    <div class="text-center">
+                        <button onclick="openDetailPopup(${item.id})" class="w-full py-1.5 bg-slate-900 text-white font-medium text-xs rounded-md hover:bg-slate-800 transition cursor-pointer">자세히 보기</button>
+                    </div>
+                `;
+
+                // 커스텀 오버레이 인스턴스 생성
+                const customOverlay = new kakao.maps.CustomOverlay({
+                    position: markerPosition,
+                    content: overlayContent,
+                    clickable: true
+                });
+
+                // 마커 객체에 직접 오버레이 인스턴스 매핑 주입
+                markers[index].overlay = customOverlay;
+
+                // 마커 클릭 이벤트: 1개씩만 열리도록 제어
+                kakao.maps.event.addListener(marker, 'click', function() {
+                    triggerOverlay(customOverlay, markerPosition);
+                });
+            });
+        }
+
+        // 5. 오버레이 토글 및 지도 포커스 핵심 제어 함수
+        function triggerOverlay(overlay, position) {
+            // 조건 3 구현: 기존에 열려있는 오버레이가 있다면 먼저 삭제(닫기)
+            if (currentOverlay) {
+                currentOverlay.setMap(null);
+            }
+            // 새로운 오버레이 띄우기
+            overlay.setMap(map);
+            currentOverlay = overlay;
+            map.panTo(position); // 클릭한 위치로 부드럽게 지도 이동
+        }
+
+        // 6. 좌측 목록 아이템 클릭 시 지도 연동 함수
+        window.focusOnMarker = function(index, lat, lng) {
+            if (markers[index]) {
+                const target = markers[index];
+                triggerOverlay(target.overlay, target.position);
+            }
+        };
+
+        // 7. 오버레이 닫기 전역 함수 (조건 2-✕버튼 대응)
+        window.closeOverlay = function() {
+            if (currentOverlay) {
+                currentOverlay.setMap(null);
+                currentOverlay = null;
+            }
+        };
+
+        // 8. 조건 4 구현: 자세히 보기 클릭 시 실제 브라우저 새 팝업창 연동
+        window.openDetailPopup = function(id) {
+            // 예시: 디테일 전용 상세 페이지가 있다면 해당 URL로 바인딩 가능합니다.
+            // 여기서는 id값을 파라미터로 넘기는 새창 팝업 예시를 들었습니다.
+            const popupUrl = `./detail.html?id=${id}`; 
+            const popupWindowName = `OfficeDetailPopup_${id}`;
+            const popupSpecs = "width=800,height=700,scrollbars=yes,resizable=yes";
+            
+            window.open(popupUrl, popupWindowName, popupSpecs);
+        };
+
+        // DOM 로드 완료 시 구동
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
