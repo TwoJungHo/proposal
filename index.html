@@ -3,75 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>마곡지구 지식산업센터 10개 단지 비교 제안</title>
+    <title>마곡지구 사무실 비교 제안</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=1c2736880e154ad5c17fe5727c4e432e"></script>
     <style>
         body { font-family: 'Pretendard', -apple-system, sans-serif; }
-        /* 카카오 지도 커스텀 오버레이 기본 그림자 제거 및 재정의 */
+        /* 카카오 지도 커스텀 오버레이 스타일 */
         .customoverlay { position: relative; bottom: 55px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
         .customoverlay::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: #fff; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0 z-10">
         <div>
             <span class="text-xs font-bold text-blue-600 tracking-wider uppercase">Market Analysis & Proposal</span>
-            <h1 class="text-xl font-bold text-slate-900 mt-0.5">마곡지구 지식산업센터 10개 단지 비교 제안</h1>
+            <h1 class="text-xl font-bold text-slate-900 mt-0.5">마곡지구 사무실 비교 제안</h1>
         </div>
-        <div class="text-right text-xs text-slate-500">
+        <div class="text-right text-xs text-slate-500 hidden sm:block">
             <p>작성일: 2026. 05</p>
             <p>제안처: 두영시스템 귀중</p>
         </div>
     </header>
 
-    <div class="flex flex-1 w-full overflow-hidden">
+    <div class="flex flex-col md:flex-row flex-1 w-full overflow-hidden">
         
-        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden">
-            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
-                <h2 class="text-md font-bold text-slate-900 flex items-center gap-1.5">
-                    🏢 사무실 목록
-                    <span id="center-count" class="text-xs font-semibold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">0</span>
-                </h2>
-                <p class="text-xs text-slate-400 mt-1">목록을 클릭하면 지도가 해당 위치로 이동합니다.</p>
+        <aside class="w-full md:w-85 h-48 md:h-full bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center md:block shrink-0">
+                <div>
+                    <h2 class="text-md font-bold text-slate-900 flex items-center gap-1.5">
+                        🏢 추천 매물 리스트
+                        <span id="center-count" class="text-xs font-semibold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">0</span>
+                    </h2>
+                    <p class="text-[11px] text-slate-400 mt-0.5 hidden md:block">리스트를 클릭하면 지도가 해당 위치로 이동합니다.</p>
+                </div>
             </div>
             
-            <div id="office-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
-                <p class="text-center text-sm text-slate-400 py-8">데이터 로딩 중...</p>
+            <div id="office-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+                <p class="text-center text-sm text-slate-400 py-4">데이터 로딩 중...</p>
             </div>
         </aside>
 
-        <main class="flex-1 relative bg-slate-100">
+        <main class="flex-1 relative bg-slate-100 h-full">
             <div id="map" class="w-full h-full"></div>
         </main>
 
     </div>
 
+    <div id="detail-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] hidden flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+        <div class="bg-white rounded-t-2xl md:rounded-2xl max-w-2xl w-full max-h-[85vh] md:max-h-[80vh] flex flex-col shadow-2xl overflow-hidden transform transition-transform duration-300 translate-y-full md:translate-y-0" id="modal-card">
+            
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 shrink-0">
+                <div>
+                    <span id="modal-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">구분</span>
+                    <h3 id="modal-title" class="text-lg font-bold text-slate-900 mt-1">물건 명칭</h3>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-2 cursor-pointer transition">✕</button>
+            </div>
+            
+            <div id="modal-body" class="p-6 overflow-y-auto space-y-5 text-sm leading-relaxed">
+                </div>
+            
+            <div class="p-4 border-t border-slate-100 bg-slate-50 text-right shrink-0">
+                <button onclick="closeDetailModal()" class="w-full md:w-auto px-6 py-2.5 bg-slate-950 text-white rounded-xl text-xs font-medium hover:bg-slate-800 transition cursor-pointer">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let map; 
         let centersData = [];
-        let currentOverlay = null; // 한번에 1개씩만 열리도록 제어하는 변수
-        let markers = []; // 마커 관리 배열
+        let currentOverlay = null; 
+        let markers = []; 
 
-        // 1. 초기 실행 및 지도 세팅
+        // 1. 시스템 초기화 및 지도 세팅
         async function init() {
             const mapContainer = document.getElementById('map');
             const mapOption = {
-                center: new kakao.maps.LatLng(37.5665, 126.8285), // 마곡역 기본 로딩 중심점
-                level: 4 // 마곡 권역이 한눈에 보이는 적절한 줌 레벨
+                center: new kakao.maps.LatLng(37.5665, 126.8285), 
+                level: 4 
             };
             map = new kakao.maps.Map(mapContainer, mapOption);
 
-            // 지도 컨트롤 추가 (줌 컨트롤러)
             const zoomControl = new kakao.maps.ZoomControl();
             map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
 
-            // 제공해주신 GitHub Raw JSON 연동
+            // 원격 원본 데이터 요청 실행
             await fetchGitHubData();
         }
 
-        // 2. GitHub 원격 저장소에서 데이터 가져오기
+        // 2. GitHub Raw JSON 데이터 연동
         async function fetchGitHubData() {
             const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/main/data.json';
             
@@ -81,10 +102,10 @@
                 
                 centersData = await response.json();
                 
-                // 사이드바 개수 카운트 업데이트
+                // 개수 카운트 반영
                 document.getElementById('center-count').innerText = centersData.length;
 
-                // UI 컴포넌트 렌더링 및 지도 마커 바인딩
+                // 데이터 바인딩 화면 그리기
                 renderSidebarList(centersData);
                 createMapMarkers(centersData);
 
@@ -92,108 +113,140 @@
                 console.error('데이터 로드 실패:', error);
                 document.getElementById('office-list').innerHTML = `
                     <div class="p-4 text-center text-xs text-red-500 font-medium">
-                        ⚠️ 데이터를 불러오지 못했습니다.<br>JSON 파일 주소나 형식을 확인해주세요.
+                        ⚠️ 데이터를 불러오지 못했습니다.
                     </div>
                 `;
             }
         }
 
-        // 3. 좌측 사이드바 사무실 목록 렌더링
+        // 3. 좌측 사이드바 리스트 동적 렌더링
         function renderSidebarList(data) {
             const listContainer = document.getElementById('office-list');
-            
             if (data.length === 0) {
-                listContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">등록된 구역이 없습니다.</p>`;
+                listContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">등록된 매물이 없습니다.</p>`;
                 return;
             }
 
-            listContainer.innerHTML = data.map((item, index) => `
-                <div onclick="focusOnMarker(${index}, ${item.lat}, ${item.lng})" 
-                     class="p-3 hover:bg-slate-50 border border-transparent hover:border-slate-200 rounded-xl cursor-pointer transition group">
-                    <div class="flex justify-between items-start gap-1">
-                        <span class="font-bold text-sm text-slate-800 group-hover:text-blue-600 transition block truncate">${item.name}</span>
-                        <span class="inline-block shrink-0 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">${item.badge || '정보'}</span>
+            listContainer.innerHTML = data.map((item, index) => {
+                let badgeClass = "";
+                let analysisText = "";
+
+                if (item.badge === "매매") {
+                    badgeClass = "bg-blue-50 text-blue-600 border border-blue-200";
+                    const pyUnitPrice = Math.round(item.price / (item.area || 1));
+                    analysisText = `<span class="text-blue-600 bg-blue-50/70 px-1.5 py-0.5 rounded text-[10px]">전용평당 ${pyUnitPrice.toLocaleString()}만</span>`;
+                } else {
+                    badgeClass = "bg-emerald-50 text-emerald-600 border border-emerald-200";
+                    const pyRentPrice = (item.monthly / (item.area || 1)).toFixed(1);
+                    analysisText = `<span class="text-emerald-600 bg-emerald-50/70 px-1.5 py-0.5 rounded text-[10px]">평당 월세 ${pyRentPrice}만</span>`;
+                }
+
+                return `
+                    <div onclick="focusOnMarker(${index})" 
+                         class="p-3 bg-white border border-slate-200 hover:border-slate-400 rounded-xl cursor-pointer transition shadow-sm group">
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="font-bold text-sm text-slate-800 group-hover:text-slate-950 transition block truncate flex-1">${item.name}</span>
+                            <span class="inline-block shrink-0 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${badgeClass}">${item.badge}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-0.5">${item.scale}</p>
+                        <p class="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed bg-slate-50 p-1.5 rounded-md">${item.desc}</p>
+                        
+                        <div class="mt-2.5 flex justify-between items-center text-xs font-semibold border-t border-slate-100 pt-2">
+                            ${analysisText}
+                            <span class="${item.badge === '매매' ? 'text-blue-700' : 'text-slate-900'}">${item.rent}</span>
+                        </div>
                     </div>
-                    <p class="text-xs text-slate-500 mt-1 line-clamp-1">${item.desc || '연면적: ' + item.scale}</p>
-                    <div class="mt-2 flex justify-between items-center text-[11px] font-medium border-t border-slate-50 pt-1.5">
-                        <span class="text-blue-600">평당 ${item.price ? item.price.toLocaleString() + '만' : '문의'}</span>
-                        <span class="text-emerald-600">${item.rent}</span>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
-        // 4. 지도 마커 및 닫기가 가능한 커스텀 오버레이 매핑
+        // 4. 지도 마커 매핑 및 인포 윈도우 핸들링
         function createMapMarkers(data) {
-            data.forEach((item, index) => {
-                if (!item.lat || !item.lng) return;
+            if (!data || data.length === 0) return;
 
-                const markerPosition = new kakao.maps.LatLng(item.lat, item.lng);
+            const bounds = new kakao.maps.LatLngBounds(); 
+            markers = []; 
+
+            data.forEach((item, index) => {
+                const lat = parseFloat(item.lat);
+                const lng = parseFloat(item.lng);
                 
-                // 마커 객체 생성 및 지도 표시
+                if (isNaN(lat) || isNaN(lng)) return; 
+
+                const markerPosition = new kakao.maps.LatLng(lat, lng);
+                
                 const marker = new kakao.maps.Marker({
                     position: markerPosition,
                     map: map
                 });
                 
-                // 추후 사이드바 연동 클릭을 위해 배열에 보관
-                markers.push({ marker, position: markerPosition, item });
+                bounds.extend(markerPosition);
 
-                // 커스텀 오버레이 엘리먼트 동적 생성 (클릭 이벤트 차단 해제 목적)
+                let metricsHTML = "";
+                if (item.badge === "매매") {
+                    const up = Math.round(item.price / (item.area || 1));
+                    metricsHTML = `<div class="flex justify-between"><span class="text-slate-400">전용 평당가</span><span class="font-bold text-blue-600">약 ${up.toLocaleString()}만원</span></div>`;
+                } else {
+                    const ur = (item.monthly / (item.area || 1)).toFixed(1);
+                    metricsHTML = `<div class="flex justify-between"><span class="text-slate-400">평당 임대료</span><span class="font-bold text-emerald-600">약 ${ur}만원</span></div>`;
+                }
+
                 const overlayContent = document.createElement('div');
-                overlayContent.className = 'customoverlay p-4 w-64 text-sm z-50';
+                overlayContent.className = 'customoverlay p-4 w-68 text-sm z-50';
                 overlayContent.innerHTML = `
                     <div class="flex justify-between items-start border-b border-slate-100 pb-2 mb-2">
-                        <span class="font-bold text-slate-900 tracking-tight block truncate pr-2">${item.name}</span>
+                        <span class="font-bold text-slate-900 tracking-tight block truncate pr-3 flex-1 text-left">${item.name}</span>
                         <button class="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer px-1" onclick="closeOverlay()">✕</button>
                     </div>
-                    <div class="space-y-1 text-xs mb-3 text-left">
-                        <div class="flex justify-between"><span class="text-slate-400">평당 분양가</span><span class="font-semibold text-blue-600">${item.price ? item.price.toLocaleString() + '만원' : '문의'}</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">보증금/월세</span><span class="font-semibold text-emerald-600">${item.rent}</span></div>
+                    <div class="space-y-1.5 text-xs mb-3 text-left">
+                        <div class="flex justify-between"><span class="text-slate-400">조건/금액</span><span class="font-bold text-slate-900">${item.rent}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">전용면적</span><span class="font-bold text-slate-900">${item.area}평</span></div>
+                        ${metricsHTML}
                     </div>
                     <div class="text-center">
-                        <button onclick="openDetailPopup(${item.id})" class="w-full py-1.5 bg-slate-900 text-white font-medium text-xs rounded-md hover:bg-slate-800 transition cursor-pointer">자세히 보기</button>
+                        <button onclick="openDetailPopup(${item.id})" class="w-full py-1.5 bg-slate-950 text-white font-medium text-xs rounded-md hover:bg-slate-800 transition cursor-pointer">상세 데이터 보고서</button>
                     </div>
                 `;
 
-                // 커스텀 오버레이 인스턴스 생성
                 const customOverlay = new kakao.maps.CustomOverlay({
                     position: markerPosition,
                     content: overlayContent,
                     clickable: true
                 });
 
-                // 마커 객체에 직접 오버레이 인스턴스 매핑 주입
-                markers[index].overlay = customOverlay;
+                markers.push({ 
+                    marker: marker, 
+                    position: markerPosition, 
+                    overlay: customOverlay
+                });
 
-                // 마커 클릭 이벤트: 1개씩만 열리도록 제어
                 kakao.maps.event.addListener(marker, 'click', function() {
                     triggerOverlay(customOverlay, markerPosition);
                 });
             });
+
+            if (markers.length > 0) {
+                map.setBounds(bounds);
+            }
         }
 
-        // 5. 오버레이 토글 및 지도 포커스 핵심 제어 함수
+        // 5. 오버레이 토글 및 카메라 핸들링
         function triggerOverlay(overlay, position) {
-            // 조건 3 구현: 기존에 열려있는 오버레이가 있다면 먼저 삭제(닫기)
             if (currentOverlay) {
                 currentOverlay.setMap(null);
             }
-            // 새로운 오버레이 띄우기
             overlay.setMap(map);
             currentOverlay = overlay;
-            map.panTo(position); // 클릭한 위치로 부드럽게 지도 이동
+            map.panTo(position); 
         }
 
-        // 6. 좌측 목록 아이템 클릭 시 지도 연동 함수
-        window.focusOnMarker = function(index, lat, lng) {
+        window.focusOnMarker = function(index) {
             if (markers[index]) {
                 const target = markers[index];
                 triggerOverlay(target.overlay, target.position);
             }
         };
 
-        // 7. 오버레이 닫기 전역 함수 (조건 2-✕버튼 대응)
         window.closeOverlay = function() {
             if (currentOverlay) {
                 currentOverlay.setMap(null);
@@ -201,18 +254,113 @@
             }
         };
 
-        // 8. 조건 4 구현: 자세히 보기 클릭 시 실제 브라우저 새 팝업창 연동
+        // 🟢 8. 고도화된 내장 반응형 모달 오픈 제어 제어문
         window.openDetailPopup = function(id) {
-            // 예시: 디테일 전용 상세 페이지가 있다면 해당 URL로 바인딩 가능합니다.
-            // 여기서는 id값을 파라미터로 넘기는 새창 팝업 예시를 들었습니다.
-            const popupUrl = `./detail.html?id=${id}`; 
-            const popupWindowName = `OfficeDetailPopup_${id}`;
-            const popupSpecs = "width=800,height=700,scrollbars=yes,resizable=yes";
-            
-            window.open(popupUrl, popupWindowName, popupSpecs);
+            const item = centersData.find(c => c.id === id);
+            if (!item) return;
+
+            const modal = document.getElementById('detail-modal');
+            const modalCard = document.getElementById('modal-card');
+            const badge = document.getElementById('modal-badge');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+
+            // 매매/임대 타입별 프리미엄 분석 지표 헤더 주입
+            let analysisSummaryHTML = "";
+
+            if (item.badge === "매매") {
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-blue-50 text-blue-600 border border-blue-200";
+                badge.innerText = "매매 분석 보고서";
+                
+                const pyUnitPrice = Math.round(item.price / (item.area || 1));
+                analysisSummaryHTML = `
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs text-blue-600 font-bold uppercase tracking-wider">전용 평당가 핵심 지표</p>
+                            <p class="text-xl font-extrabold text-blue-900 mt-0.5">평당 ${pyUnitPrice.toLocaleString()} 만원</p>
+                        </div>
+                        <i class="fa-solid fa-chart-pie text-blue-300 text-2xl hidden sm:block"></i>
+                    </div>
+                `;
+            } else {
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-emerald-50 text-emerald-600 border border-emerald-200";
+                badge.innerText = "임대대차 분석 보고서";
+                
+                const pyRentPrice = (item.monthly / (item.area || 1)).toFixed(1);
+                analysisSummaryHTML = `
+                    <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs text-emerald-600 font-bold uppercase tracking-wider">평당 임대료 가성비 지표</p>
+                            <p class="text-xl font-extrabold text-emerald-900 mt-0.5">월 ${pyRentPrice} 만원 / 평</p>
+                        </div>
+                        <i class="fa-solid fa-calculator text-emerald-300 text-2xl hidden sm:block"></i>
+                    </div>
+                `;
+            }
+
+            title.innerText = item.name;
+
+            // 모달 본문 상세 대시보드 템플릿 마크업 작성
+            body.innerHTML = `
+                ${analysisSummaryHTML}
+
+                <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs sm:text-sm">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-medium">공간 구조 및 평형</p>
+                        <p class="font-bold text-slate-800 mt-0.5">${item.scale}</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-medium">제시 단가 조건</p>
+                        <p class="font-bold text-slate-900 mt-0.5">${item.rent}</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400">🎯 매물 특이사항 및 인프라</h4>
+                    <div class="p-4 bg-white border border-slate-200 rounded-xl space-y-2 text-slate-700 text-xs sm:text-sm shadow-sm">
+                        ${item.desc.split('/').map(text => `
+                            <p class="flex items-start gap-2">
+                                <span class="text-blue-500 font-bold shrink-0">✓</span>
+                                <span class="leading-relaxed">${text.trim()}</span>
+                            </p>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-100">
+                    <h4 class="font-bold text-slate-500 text-xs uppercase tracking-wider">📍 입지 전략 평가 요약</h4>
+                    <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
+                        본 자산은 마곡 핵심 권역 내에 위치해 있으며 대기업 R&D 센터군과의 클러스터 인접성이 매우 탁월합니다. 도보 접근 환경 및 차량 주차 컨디션이 우수하여 기업 오피스 운영 및 자산 가치 방어에 대단히 우수한 스펙을 유지하고 있습니다. 본 데이터는 두영시스템 맞춤형 오피스 큐레이션을 위해 작성되었습니다.
+                    </p>
+                </div>
+            `;
+
+            // 모달 노출 활성화 및 모바일 애니메이션 전개
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalCard.classList.remove('translate-y-full');
+            }, 10);
         };
 
-        // DOM 로드 완료 시 구동
+        // 9. 모달 비활성화
+        window.closeDetailModal = function() {
+            const modal = document.getElementById('detail-modal');
+            const modalCard = document.getElementById('modal-card');
+            
+            modalCard.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 250); // 트랜지션 애니메이션 완료 후 히든 처리
+        };
+
+        // 에스케이프(ESC) 키클릭 시 오버레이 및 모달 창 클로징 인터랙션 보정
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape') {
+                closeDetailModal();
+                closeOverlay();
+            }
+        });
+
         window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
