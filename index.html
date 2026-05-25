@@ -94,14 +94,14 @@
 
         // 2. GitHub Raw JSON 데이터 연동
         async function fetchGitHubData() {
-            const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/main/data.json';
+            const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/refs/heads/main/data.json';
             
             try {
                 const response = await fetch(jsonUrl);
                 if (!response.ok) throw new Error(`HTTP 에러 발생! 상태코드: ${response.status}`);
                 
                 centersData = await response.json();
-                
+                console.log(centersData)
                 // 개수 카운트 반영
                 document.getElementById('center-count').innerText = centersData.length;
 
@@ -301,6 +301,7 @@
             title.innerText = item.name;
 
             // 모달 본문 상세 대시보드 템플릿 마크업 작성
+            console.log(item)
             body.innerHTML = `
                 ${analysisSummaryHTML}
 
@@ -310,7 +311,7 @@
                         <p class="font-bold text-slate-800 mt-0.5">${item.scale}</p>
                     </div>
                     <div>
-                        <p class="text-[11px] text-slate-400 font-medium">제시 단가 조건</p>
+                        <p class="text-[11px] text-slate-400 font-medium">단가 조건</p>
                         <p class="font-bold text-slate-900 mt-0.5">${item.rent}</p>
                     </div>
                 </div>
