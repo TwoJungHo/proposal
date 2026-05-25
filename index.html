@@ -22,7 +22,11 @@
             border-radius: 12px; 
             background-color: #f1f5f9; 
             margin-bottom: 20px; 
+            cursor: grab; /* PC에서 잡고 끌 수 있는 마우스 커서 표시 */
+            user-select: none; /* 드래그 시 텍스트나 이미지 블록 방지 */
         }
+        .slider-container:active { cursor: grabbing; } /* 잡고 끌 때 커서 변경 */
+        
         @media (max-width: 768px) {
             .slider-container { height: 220px; }
         }
@@ -41,6 +45,7 @@
             width: 100%; 
             height: 100%; 
             object-fit: cover; 
+            pointer-events: none; /* 이미지 자체 드래그 방지 */
         }
         .slider-btn { 
             position: absolute; 
@@ -141,7 +146,11 @@
         let centersData = [];
         let currentOverlay = null; 
         let markers = []; 
-        let currentSlideIdx = 0; // 슬라이더 제어용 인덱스
+        let currentSlideIdx = 0; 
+
+        // 🖐️ 터치 및 드래그 슬라이드 제어용 변수
+        let startX = 0;
+        let isDragging = false;
 
         // 1. 시스템 초기화 및 지도 세팅
         async function init() {
@@ -223,7 +232,7 @@
             }).join('');
         }
 
-        // 4. 지도 마커 매핑 및 인포 윈도우(커스텀 오버레이) 핸들링
+        // 4. 지도 마커 매핑 및 인포 윈도우 핸들링
         function createMapMarkers(data) {
             if (!data || data.length === 0) return;
 
@@ -238,7 +247,6 @@
 
                 const markerPosition = new kakao.maps.LatLng(lat, lng);
                 
-                // 🔵 🟢 외부 서버 의존 없는 순수 카카오 마커 유지
                 const marker = new kakao.maps.Marker({
                     position: markerPosition,
                     map: map
@@ -246,7 +254,6 @@
                 
                 bounds.extend(markerPosition);
 
-                // 분석 지표 사전 계산
                 let metricsHTML = "";
                 if (item.badge === "매매") {
                     const up = Math.round(item.price / (item.area || 1));
@@ -321,12 +328,12 @@
             }
         };
 
-        // 🟢 8. 이미지 슬라이더 내장 고도화 모달 오픈 제어문
+        // 🟢 8. 이미지 슬라이더 (버튼 + 터치/드래그 지원) 모달 오픈 제어문
         window.openDetailPopup = function(id) {
             const item = centersData.find(c => c.id === id);
             if (!item) return;
 
-            currentSlideIdx = 0; // 모달을 열 때 슬라이더 초기화
+            currentSlideIdx = 0; 
 
             const modal = document.getElementById('detail-modal');
             const modalCard = document.getElementById('modal-card');
@@ -334,24 +341,24 @@
             const title = document.getElementById('modal-title');
             const body = document.getElementById('modal-body');
 
-            // --- 📸 이미지 슬라이더 동적 구현 마크업 설정 ---
+            // --- 📸 이미지 슬라이더 구조 생성 (방법 2 구조 적용) ---
             let sliderHTML = "";
             if (item.images && item.images.length > 0) {
                 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/TwoJungHo/proposal/main/images/";
                 sliderHTML = `
-                    <div class="slider-container group">
+                    <div class="slider-container group" id="slider-container">
                         <div class="slider-wrapper" id="slider-wrapper">
-                            ${item.images.map(fileName => `
+                            ${item.images.map(imgUrl => `
                                 <div class="slider-item">
-                                    <img src="${GITHUB_RAW_BASE + fileName}" 
+                                    <img src="${GITHUB_RAW_BASE + imgUrl}" 
                                          alt="${item.name} 현장 사진" 
                                          onerror="this.src='https://placehold.co/600x400?text=No+Image'">
                                 </div>
                             `).join('')}
                         </div>
                         ${item.images.length > 1 ? `
-                            <button class="slider-btn left-0 rounded-r-lg" onclick="moveSlide(-1)">❮</button>
-                            <button class="slider-btn right-0 rounded-l-lg" onclick="moveSlide(1)">❯</button>
+                            <button class="slider-btn left-0 rounded-r-lg" onclick="moveSlide(-1); event.stopPropagation();">❮</button>
+                            <button class="slider-btn right-0 rounded-l-lg" onclick="moveSlide(1); event.stopPropagation();">❯</button>
                             <div class="slider-dots">
                                 ${item.images.map((_, i) => `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`).join('')}
                             </div>
@@ -434,9 +441,12 @@
             setTimeout(() => {
                 modalCard.classList.remove('translate-y-full');
             }, 10);
+
+            // 🟢 모달 렌더링 직후, 드래그/터치 스와이프 이벤트 바인딩 호출
+            bindSwipeEvents();
         };
 
-        // 9. 이미지 슬라이더 터치/클릭 무브먼트 핸들러
+        // 9. 이미지 슬라이더 버튼식 넘김 제어 함수
         window.moveSlide = function(direction) {
             const wrapper = document.getElementById('slider-wrapper');
             if (!wrapper) return;
@@ -447,11 +457,57 @@
             currentSlideIdx = (currentSlideIdx + direction + totalSlides) % totalSlides;
             wrapper.style.transform = `translateX(-${currentSlideIdx * 100}%)`;
 
-            // 인디케이터 점(Dots) 갱신
             document.querySelectorAll('.dot').forEach((dot, index) => {
                 dot.classList.toggle('active', index === currentSlideIdx);
             });
         };
+
+        // 🔄 9-2. 드래그 및 터치 스와이프 이벤트 바인딩 함수 (추가 기능)
+        function bindSwipeEvents() {
+            const container = document.getElementById('slider-container');
+            if (!container) return;
+
+            // --- 📱 모바일 터치 이벤트 처리 ---
+            container.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+            }, { passive: true });
+
+            container.addEventListener('touchend', (e) => {
+                const endX = e.changedTouches[0].clientX;
+                handleSwipe(startX, endX);
+            }, { passive: true });
+
+            // --- 💻 PC 마우스 드래그 이벤트 처리 ---
+            container.addEventListener('mousedown', (e) => {
+                startX = e.clientX;
+                isDragging = true;
+            });
+
+            container.addEventListener('mouseup', (e) => {
+                if (!isDragging) return;
+                const endX = e.clientX;
+                handleSwipe(startX, endX);
+                isDragging = false;
+            });
+
+            container.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+        }
+
+        // 스와이프 방향 계산 및 분기 처리
+        function handleSwipe(start, end) {
+            const threshold = 40; // 스와이프로 인정할 최소 픽셀 거리 거리값
+            const diff = start - end;
+
+            if (Math.abs(diff) > threshold) {
+                if (diff > 0) {
+                    moveSlide(1);  // 왼쪽으로 밀었으니 다음 이미지
+                } else {
+                    moveSlide(-1); // 오른쪽으로 밀었으니 이전 이미지
+                }
+            }
+        }
 
         // 10. 모달창 닫기 제어
         window.closeDetailModal = function() {
@@ -464,7 +520,6 @@
             }, 250);
         };
 
-        // ESC 키다운 예외 처리 인터랙션
         window.addEventListener('keydown', (e) => {
             if(e.key === 'Escape') {
                 closeDetailModal();
