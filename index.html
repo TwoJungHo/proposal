@@ -8,9 +8,75 @@
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=1c2736880e154ad5c17fe5727c4e432e"></script>
     <style>
         body { font-family: 'Pretendard', -apple-system, sans-serif; }
-        /* 카카오 지도 커스텀 오버레이 스타일 */
+        
+        /* 카카오 지도 커스텀 오버레이 스타일 리뉴얼 */
         .customoverlay { position: relative; bottom: 55px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
         .customoverlay::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: #fff; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+
+        /* --- 📸 이미지 슬라이더 전용 CSS 스타일 --- */
+        .slider-container { 
+            position: relative; 
+            width: 100%; 
+            height: 280px; 
+            overflow: hidden; 
+            border-radius: 12px; 
+            background-color: #f1f5f9; 
+            margin-bottom: 20px; 
+        }
+        @media (max-width: 768px) {
+            .slider-container { height: 220px; }
+        }
+        .slider-wrapper { 
+            display: flex; 
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            height: 100%; 
+            width: 100%;
+        }
+        .slider-item { 
+            min-width: 100%; 
+            height: 100%; 
+            flex-shrink: 0;
+        }
+        .slider-item img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
+        .slider-btn { 
+            position: absolute; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            background-color: rgba(0,0,0,0.3); 
+            color: white; 
+            border: none; 
+            padding: 16px 10px; 
+            cursor: pointer; 
+            z-index: 10; 
+            backdrop-filter: blur(4px); 
+            transition: background-color 0.3s;
+        }
+        .slider-btn:hover { background-color: rgba(0,0,0,0.7); }
+        .slider-dots { 
+            position: absolute; 
+            bottom: 12px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            display: flex; 
+            gap: 6px; 
+            z-index: 10; 
+        }
+        .dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            background-color: rgba(255,255,255,0.5); 
+            transition: all 0.3s; 
+        }
+        .dot.active { 
+            background-color: #fff; 
+            width: 20px; 
+            border-radius: 4px; 
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
@@ -75,12 +141,13 @@
         let centersData = [];
         let currentOverlay = null; 
         let markers = []; 
+        let currentSlideIdx = 0; // 슬라이더 제어용 인덱스
 
         // 1. 시스템 초기화 및 지도 세팅
         async function init() {
             const mapContainer = document.getElementById('map');
             const mapOption = {
-                center: new kakao.maps.LatLng(37.5594408555742, 126.8294047574378), 
+                center: new kakao.maps.LatLng(37.5665, 126.8285), 
                 level: 4 
             };
             map = new kakao.maps.Map(mapContainer, mapOption);
@@ -88,24 +155,20 @@
             const zoomControl = new kakao.maps.ZoomControl();
             map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
 
-            // 원격 원본 데이터 요청 실행
             await fetchGitHubData();
         }
 
         // 2. GitHub Raw JSON 데이터 연동
         async function fetchGitHubData() {
-            const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/refs/heads/main/data.json';
+            const jsonUrl = 'https://raw.githubusercontent.com/TwoJungHo/proposal/main/data.json';
             
             try {
                 const response = await fetch(jsonUrl);
                 if (!response.ok) throw new Error(`HTTP 에러 발생! 상태코드: ${response.status}`);
                 
                 centersData = await response.json();
-                console.log(centersData)
-                // 개수 카운트 반영
                 document.getElementById('center-count').innerText = centersData.length;
 
-                // 데이터 바인딩 화면 그리기
                 renderSidebarList(centersData);
                 createMapMarkers(centersData);
 
@@ -160,7 +223,7 @@
             }).join('');
         }
 
-        // 4. 지도 마커 매핑 및 인포 윈도우 핸들링
+        // 4. 지도 마커 매핑 및 인포 윈도우(커스텀 오버레이) 핸들링
         function createMapMarkers(data) {
             if (!data || data.length === 0) return;
 
@@ -175,6 +238,7 @@
 
                 const markerPosition = new kakao.maps.LatLng(lat, lng);
                 
+                // 🔵 🟢 외부 서버 의존 없는 순수 카카오 마커 유지
                 const marker = new kakao.maps.Marker({
                     position: markerPosition,
                     map: map
@@ -182,6 +246,7 @@
                 
                 bounds.extend(markerPosition);
 
+                // 분석 지표 사전 계산
                 let metricsHTML = "";
                 if (item.badge === "매매") {
                     const up = Math.round(item.price / (item.area || 1));
@@ -230,7 +295,7 @@
             }
         }
 
-        // 5. 오버레이 토글 및 카메라 핸들링
+        // 5. 오버레이 토글 제어
         function triggerOverlay(overlay, position) {
             if (currentOverlay) {
                 currentOverlay.setMap(null);
@@ -240,6 +305,7 @@
             map.panTo(position); 
         }
 
+        // 6. 브릿지 연동 호출 체계
         window.focusOnMarker = function(index) {
             if (markers[index]) {
                 const target = markers[index];
@@ -247,6 +313,7 @@
             }
         };
 
+        // 7. 오버레이 닫기
         window.closeOverlay = function() {
             if (currentOverlay) {
                 currentOverlay.setMap(null);
@@ -254,10 +321,12 @@
             }
         };
 
-        // 🟢 8. 고도화된 내장 반응형 모달 오픈 제어 제어문
+        // 🟢 8. 이미지 슬라이더 내장 고도화 모달 오픈 제어문
         window.openDetailPopup = function(id) {
             const item = centersData.find(c => c.id === id);
             if (!item) return;
+
+            currentSlideIdx = 0; // 모달을 열 때 슬라이더 초기화
 
             const modal = document.getElementById('detail-modal');
             const modalCard = document.getElementById('modal-card');
@@ -265,7 +334,34 @@
             const title = document.getElementById('modal-title');
             const body = document.getElementById('modal-body');
 
-            // 매매/임대 타입별 프리미엄 분석 지표 헤더 주입
+            // --- 📸 이미지 슬라이더 동적 구현 마크업 설정 ---
+            let sliderHTML = "";
+            if (item.images && item.images.length > 0) {
+                const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/TwoJungHo/proposal/main/images/";
+
+                sliderHTML = `
+                    <div class="slider-container group">
+                        <div class="slider-wrapper" id="slider-wrapper">
+                            ${item.images.map(fileName => `
+                                <div class="slider-item">
+                                    <img src="${GITHUB_RAW_BASE + fileName}" 
+                                         alt="${item.name} 현장 사진" 
+                                         onerror="this.src='https://placehold.co/600x400?text=No+Image'">
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${item.images.length > 1 ? `
+                            <button class="slider-btn left-0 rounded-r-lg" onclick="moveSlide(-1)">❮</button>
+                            <button class="slider-btn right-0 rounded-l-lg" onclick="moveSlide(1)">❯</button>
+                            <div class="slider-dots">
+                                ${item.images.map((_, i) => `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // --- 📊 매매/임대 타입별 프리미엄 분석 지표 헤더 주입 ---
             let analysisSummaryHTML = "";
 
             if (item.badge === "매매") {
@@ -279,7 +375,6 @@
                             <p class="text-xs text-blue-600 font-bold uppercase tracking-wider">전용 평당가 핵심 지표</p>
                             <p class="text-xl font-extrabold text-blue-900 mt-0.5">평당 ${pyUnitPrice.toLocaleString()} 만원</p>
                         </div>
-                        <i class="fa-solid fa-chart-pie text-blue-300 text-2xl hidden sm:block"></i>
                     </div>
                 `;
             } else {
@@ -293,19 +388,19 @@
                             <p class="text-xs text-emerald-600 font-bold uppercase tracking-wider">평당 임대료 가성비 지표</p>
                             <p class="text-xl font-extrabold text-emerald-900 mt-0.5">월 ${pyRentPrice} 만원 / 평</p>
                         </div>
-                        <i class="fa-solid fa-calculator text-emerald-300 text-2xl hidden sm:block"></i>
                     </div>
                 `;
             }
 
             title.innerText = item.name;
 
-            // 모달 본문 상세 대시보드 템플릿 마크업 작성
-            console.log(item)
+            // --- 🧱 최종 모달 본문 통합 레이아웃 주입 ---
             body.innerHTML = `
+                ${sliderHTML}
+                
                 ${analysisSummaryHTML}
 
-                <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs sm:text-sm">
+                <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs sm:text-sm mt-5">
                     <div>
                         <p class="text-[11px] text-slate-400 font-medium">공간 구조 및 평형</p>
                         <p class="font-bold text-slate-800 mt-0.5">${item.scale}</p>
@@ -317,7 +412,7 @@
                 </div>
                 
                 <div class="space-y-2">
-                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400">🎯 매물 특이사항 및 인프라</h4>
+                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400">🎯 핵심 매물 특성 및 인프라</h4>
                     <div class="p-4 bg-white border border-slate-200 rounded-xl space-y-2 text-slate-700 text-xs sm:text-sm shadow-sm">
                         ${item.desc.split('/').map(text => `
                             <p class="flex items-start gap-2">
@@ -329,21 +424,37 @@
                 </div>
 
                 <div class="space-y-2 pt-2 border-t border-slate-100">
-                    <h4 class="font-bold text-slate-500 text-xs uppercase tracking-wider">📍 입지 전략 평가 요약</h4>
-                    <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
-                    ${item.analysis}
+                    <h4 class="font-bold text-blue-600 text-xs uppercase tracking-wider">📍 입지 전략 평가 요약</h4>
+                    <p class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-dashed border-slate-200">
+                        ${item.analysis || '본 자산은 마곡 핵심 권역 내에 위치해 있으며 입지 조건이 우수합니다.'}
                     </p>
                 </div>
             `;
 
-            // 모달 노출 활성화 및 모바일 애니메이션 전개
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modalCard.classList.remove('translate-y-full');
             }, 10);
         };
 
-        // 9. 모달 비활성화
+        // 9. 이미지 슬라이더 터치/클릭 무브먼트 핸들러
+        window.moveSlide = function(direction) {
+            const wrapper = document.getElementById('slider-wrapper');
+            if (!wrapper) return;
+            
+            const totalSlides = wrapper.children.length;
+            if (totalSlides <= 1) return;
+
+            currentSlideIdx = (currentSlideIdx + direction + totalSlides) % totalSlides;
+            wrapper.style.transform = `translateX(-${currentSlideIdx * 100}%)`;
+
+            // 인디케이터 점(Dots) 갱신
+            document.querySelectorAll('.dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlideIdx);
+            });
+        };
+
+        // 10. 모달창 닫기 제어
         window.closeDetailModal = function() {
             const modal = document.getElementById('detail-modal');
             const modalCard = document.getElementById('modal-card');
@@ -351,10 +462,10 @@
             modalCard.classList.add('translate-y-full');
             setTimeout(() => {
                 modal.classList.add('hidden');
-            }, 250); // 트랜지션 애니메이션 완료 후 히든 처리
+            }, 250);
         };
 
-        // 에스케이프(ESC) 키클릭 시 오버레이 및 모달 창 클로징 인터랙션 보정
+        // ESC 키다운 예외 처리 인터랙션
         window.addEventListener('keydown', (e) => {
             if(e.key === 'Escape') {
                 closeDetailModal();
